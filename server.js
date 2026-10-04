@@ -104,7 +104,13 @@ function nextRoepnummer(rolNaam, excludeId) {
 const API_KEY = process.env.API_KEY;
 function checkApiKey(req, res, next) {
   if (!API_KEY) return next(); // geen key ingesteld = open (handig tijdens lokaal testen)
-  if (req.header("x-api-key") !== API_KEY) return res.status(401).json({ error: "Ongeldige of ontbrekende API key." });
+  const ontvangen = req.header("x-api-key");
+  if (ontvangen !== API_KEY) {
+    console.log("[API_KEY DEBUG] verwacht-lengte:", API_KEY.length, "ontvangen-lengte:", ontvangen ? ontvangen.length : "GEEN HEADER");
+    console.log("[API_KEY DEBUG] verwacht (eerste/laatste 4):", API_KEY.slice(0, 4), "...", API_KEY.slice(-4));
+    console.log("[API_KEY DEBUG] ontvangen (eerste/laatste 4):", ontvangen ? ontvangen.slice(0, 4) + " ... " + ontvangen.slice(-4) : "n.v.t.");
+    return res.status(401).json({ error: "Ongeldige of ontbrekende API key." });
+  }
   next();
 }
 
@@ -252,8 +258,9 @@ app.patch("/api/employees/:discordId", checkApiKey, (req, res) => {
   const emp = db.prepare("SELECT * FROM employees WHERE discord_id = ?").get(discordId);
   if (!emp) return res.status(404).json({ error: "Medewerker niet gevonden." });
 
-  const { rol, status, opmerkingen, ingame, roepnummer } = req.body;
+  const { rol, status, opmerkingen, ingame, roepnummer, naam } = req.body;
   const nieuweRol = rol || emp.rol;
+  const nieuweNaam = naam && naam.trim() ? naam.trim() : emp.naam;
 
   let nieuweRoepnummer = rol && rol !== emp.rol ? nextRoepnummer(nieuweRol, discordId) : emp.roepnummer;
   if (roepnummer !== undefined && roepnummer !== null && roepnummer !== "") {
@@ -262,8 +269,8 @@ app.patch("/api/employees/:discordId", checkApiKey, (req, res) => {
     nieuweRoepnummer = roepnummer;
   }
 
-  db.prepare("UPDATE employees SET rol = ?, roepnummer = ?, status = ?, opmerkingen = ?, ingame = ? WHERE discord_id = ?")
-    .run(nieuweRol, nieuweRoepnummer, status || emp.status, opmerkingen ?? emp.opmerkingen, ingame ?? emp.ingame, discordId);
+  db.prepare("UPDATE employees SET rol = ?, roepnummer = ?, status = ?, opmerkingen = ?, ingame = ?, naam = ? WHERE discord_id = ?")
+    .run(nieuweRol, nieuweRoepnummer, status || emp.status, opmerkingen ?? emp.opmerkingen, ingame ?? emp.ingame, nieuweNaam, discordId);
   res.json(db.prepare("SELECT * FROM employees WHERE discord_id = ?").get(discordId));
 });
 
