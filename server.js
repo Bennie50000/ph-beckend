@@ -189,6 +189,25 @@ app.get("/api/accounts", (req, res) => {
   res.json(accounts);
 });
 
+app.delete("/api/accounts/:username", (req, res) => {
+  const { username } = req.params;
+  const { beheerderUsername } = req.body;
+
+  const beheerder = db.prepare("SELECT * FROM accounts WHERE username = ?").get(beheerderUsername);
+  if (!beheerder || beheerder.permissie !== "Admin") {
+    return res.status(403).json({ error: "Alleen Admin-accounts mogen accounts verwijderen." });
+  }
+  if (username === beheerderUsername) {
+    return res.status(400).json({ error: "Je kan je eigen account niet verwijderen." });
+  }
+
+  const bestaat = db.prepare("SELECT 1 FROM accounts WHERE username = ?").get(username);
+  if (!bestaat) return res.status(404).json({ error: "Account niet gevonden." });
+
+  db.prepare("DELETE FROM accounts WHERE username = ?").run(username);
+  res.json({ verwijderd: username });
+});
+
 // --- Wachtwoord vergeten --------------------------------------------------
 
 app.post("/api/forgot-password", async (req, res) => {
